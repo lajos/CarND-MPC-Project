@@ -7,7 +7,7 @@ using CppAD::AD;
 
 // Set the timestep length and duration
 size_t N = 10;
-double dt = 0.11;
+double dt = 0.12;
 
 // This value assumes the model presented in the classroom is used.
 //
