@@ -68,12 +68,14 @@ The cost function used by the optimizer is in the form:
 The cost function is a weighted sum of the these error terms:
 
 * **cte** - distance from preferred path
-* **psi error** - difference in orientation
+* **epsi** - difference in orientation
 * **reference velocity** - difference from target speed
 * **steering** - stay on track with minimum steering value
 * **accelerator** - efficient use of throttle/brake
 * **steering change** - to avoid sharp change in steering
 * **accelerator change** - to avoid sharp change in acceleration and braking
+
+Each term has a weight associated to it. The highest weights are assigned to **cte**, **epsi** and **steering change** to ensure driving close to the preferred path, while keeping steering input smoot.
 
 ---
 
@@ -101,6 +103,40 @@ After analyzing the data, I chose **N=10** and **dt=0.12** for the best combinat
 ---
 
 ## Latency
+
+In a real life car there are actuator latencies. To simulate latency, our program implements a 100ms delay.
+
+The MPC solver also takes some time. The time used by the solver is measured in the code and the recorded value is smoothed over time using [linear interpolation](https://en.wikipedia.org/wiki/Linear_interpolation). The solver latency varies frame to frame as shown in the graph below, recorded over one lap:
+
+![Solver latency](writeup/solver_latency.png)
+
+The latencies are added up to get the total latency:
+
+* **total_latency** = actuator_latency + solver_time
+
+To handle latency, the car's position and orientation is projected forward based on it's current speed, heading and steering angle using the bicycle model:
+
+* px' = px + total_latency \* v \* cos(psi);
+* py' = py + total_latency \* v \* sin(psi);
+* psi' = psi - total_latency \* v \* steering_angle / Lf;
+
+The solver then uses this projected state of the car to optimize actuator values from.
+
+NOTE: The simulator should also have some latency for rendering the frame, but I couldn't find a way to measure it and the simulation was working well on my system.
+
+---
+
+## Result
+
+A recording of the car driving:
+
+[![MPC Controller](writeup/screen.png)](https://youtu.be/Yug0_oQ10k0 "MPC Controller")
+
+The car drives around the track at an average speed of 50mph and reaches a maximum speed of 74mph. It correctly speeds up in straightaways and slows down for turns.
+
+This graph shows the predefined waypoints and preferred path in blue, while the actual recorded path of the car in red:
+
+![Track](writeup/track.png)
 
 ---
 
