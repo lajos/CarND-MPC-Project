@@ -75,23 +75,32 @@ The cost function is a weighted sum of the these error terms:
 * **steering change** - to avoid sharp change in steering
 * **accelerator change** - to avoid sharp change in acceleration and braking
 
+---
 
 ## Optimizer Parameters
 
-The MPC uses **N** time steps with **dt** duration between steps to optimize the actuator controls (steering/accelerator) while minimizing the cost function.
+The solver uses **N** time steps with **dt** duration between steps to optimize the actuator controls (steering/accelerator) while minimizing the cost function.
 
-The optimization step is very processor intensive task. Time spent by the optimizer can be reduced by using less time steps (**N**), however setting the time steps too low will result in suboptimal actuator inputs, possibly even crashing the car.
+The solving step is very processor intensive task. Time spent by the solver can be reduced by using less time steps (**N**), however setting the time steps too low will result in suboptimal actuator inputs, possibly even crashing the car.
 
 The duration per step value, in conjunction with the number of steps, defines how far ahead the path is planned. The optimum value sets the look ahead so that the car can react to the path with comfortable actuator inputs, while making sure that sharp changes in the path are not ignored due to long time steps.
 
+To determine the best values, data is collected from every time step and written into a CSV file. The data was analyzed in Excel (included data.xlsx file).
+
+| N        | dt           | cte average  | speed average | solver time average |
+| ------------- |:-------------:| -----:| -----:| -----:|
+| 10 | 0.12 | 0.096 | 50.05 | 0.019 |
+| 8 | 0.12 | 0.189 | 49.33 | 0.015 |
+| 14 | 0.12 | 0.086 | 52.25 | 0.031 |
+| 10 | 0.8 | 0.147 | 56.31 | 0.017 |
+| 10 | 0.16 | 0.005 | 45.00 | 0.020 |
+
+After analyzing the data, I chose **N=10** and **dt=0.12** for the best combination of low cte and solver time, while achieving a good speed around the track.
 
 
+---
 
-
-
-Student discusses the reasoning behind the chosen N (timestep length) and dt (elapsed duration between timesteps) values. Additionally the student details the previous values tried.
-
-Student provides details on how they deal with latency.
+## Latency
 
 ---
 
