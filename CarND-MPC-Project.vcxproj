@@ -128,6 +128,9 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MPC.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="eigen.natvis" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

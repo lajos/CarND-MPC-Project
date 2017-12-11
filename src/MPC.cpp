@@ -22,10 +22,9 @@ double dt = 0.11;
 const double Lf = 2.67;
 
 // Both the reference cross track and orientation errors are 0.
-// The reference velocity is set to 40 mph.
 double ref_cte = 0.0;
 double ref_epsi = 0.0;
-double ref_v = 40;
+double ref_v = 80;          // reference velocity
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -44,7 +43,7 @@ size_t a_start = delta_start + N - 1;
 const double cost_w_cte = 2500;        // cte
 const double cost_w_epsi = 2500;       // epsi
 const double cost_w_v = 1;             // speed
-const double cost_w_delta = 6;	       // steer
+const double cost_w_delta = 100;	   // steer
 const double cost_w_a = 5;             // throttle
 const double cost_w_d_delta = 2500;    // steer change
 const double cost_w_d_a = 10;          // throttle change
@@ -118,10 +117,6 @@ public:
 			AD<double> delta0 = vars[delta_start + t - 1];
 			AD<double> a0 = vars[a_start + t - 1];
 
-			// TODO: remove
-			//AD<double> f0 = coeffs[0] + coeffs[1] * x0;
-			//AD<double> psides0 = CppAD::atan(coeffs[1]);
-
 			// cache x^2 and x^3
 			AD<double> x0_2 = x0 * x0;
 			AD<double> x0_3 = x0_2 * x0;
@@ -135,7 +130,6 @@ public:
 			AD<double> psides0 = CppAD::atan(coeffs(1) + 2 * coeffs(2) * x0
 											 + 3 * coeffs(3) * x0_2);
 
-
 			// Model equations:
 			// x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
 			// y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
@@ -143,12 +137,14 @@ public:
 			// v_[t+1] = v[t] + a[t] * dt
 			// cte[t+1] = f(x[t]) - y[t] + v[t] * sin(epsi[t]) * dt
 			// epsi[t+1] = psi[t] - psides[t] + v[t] * delta[t] / Lf * dt
+
 			fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
 			fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
 			fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
 			fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
 			fg[1 + cte_start + t] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
 			fg[1 + epsi_start + t] = epsi1 - ((psi0 - psides0) + v0 * delta0 / Lf * dt);
+
 		}
 	}
 };
@@ -159,7 +155,7 @@ public:
 MPC::MPC() {}
 MPC::~MPC() {}
 
-vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
+vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs, vector<double>& mpc_x_vals, vector<double>& mpc_y_vals) {
 	bool ok = true;
 	size_t i;
 	typedef CPPAD_TESTVECTOR(double) Dvector;
@@ -192,17 +188,17 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 		vars_lowerbound[i] = -1.0e19;
 		vars_upperbound[i] = 1.0e19;
 	}
-	// Limit steering delta to +-25 degrees, in radians
+	// Limit steering delta (max value 0.436332 (25 degrees in radians))
+	const double max_steering_delta = 0.3;
 	for (int i = delta_start; i < a_start; i++) {
-		vars_lowerbound[i] = -0.436332;
-		vars_upperbound[i] = 0.436332;
+		vars_lowerbound[i] = -max_steering_delta;
+		vars_upperbound[i] = max_steering_delta;
 	}
 	// Throttle limits
 	for (int i = a_start; i < n_vars; i++) {
-		vars_lowerbound[i] = -1.0;
-		vars_upperbound[i] = 1.0;
+		vars_lowerbound[i] = -0.1;
+		vars_upperbound[i] = 0.8;
 	}
-
 
 	// Lower and upper limits for constraints
 	Dvector constraints_lowerbound(n_constraints);
@@ -211,6 +207,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 		constraints_lowerbound[i] = 0;
 		constraints_upperbound[i] = 0;
 	}
+
+	constraints_lowerbound[x_start] = state[0];
+	constraints_lowerbound[y_start] = state[1];
+	constraints_lowerbound[psi_start] = state[2];
+	constraints_lowerbound[v_start] = state[3];
+	constraints_lowerbound[cte_start] = state[4];
+	constraints_lowerbound[epsi_start] = state[5];
+
+	constraints_upperbound[x_start] = state[0];
+	constraints_upperbound[y_start] = state[1];
+	constraints_upperbound[psi_start] = state[2];
+	constraints_upperbound[v_start] = state[3];
+	constraints_upperbound[cte_start] = state[4];
+	constraints_upperbound[epsi_start] = state[5];
 
 	// object that computes objective and constraints
 	FG_eval fg_eval(coeffs);
@@ -231,10 +241,15 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
 	// solve the problem
 	CppAD::ipopt::solve<Dvector, FG_eval>(
-		options, vars, vars_lowerbound, vars_upperbound, constraints_lowerbound,
-		constraints_upperbound, fg_eval, solution);
+		options,
+		vars,
+		vars_lowerbound,
+		vars_upperbound,
+		constraints_lowerbound,
+		constraints_upperbound,
+		fg_eval,
+		solution);
 
-	// Check some of the solution values
 	ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
 	if (!ok) cout << "ERROR: Solver failed!";
 
@@ -242,9 +257,11 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 	auto cost = solution.obj_value;
 	std::cout << "Cost " << cost << std::endl;
 
+	// resize MPC x,y storage vectors to fit N steps
 	mpc_x_vals.resize(N - 1);
 	mpc_y_vals.resize(N - 1);
 
+	// copy solution values
 	for (int i = 0; i < N - 1; i++) {
 		mpc_x_vals[i] = solution.x[x_start + i + 1];
 		mpc_y_vals[i] = solution.x[y_start + i + 1];
