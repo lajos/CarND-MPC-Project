@@ -1,13 +1,95 @@
-# CarND-Controls-MPC
-Self-Driving Car Engineer Nanodegree Program
+# CarND MPC Control Project
+Udacity Self-Driving Car Engineer Nanodegree Program
 
 ---
 
-Student describes their model in detail. This includes the state, actuators and update equations.
+## Overview
+
+The goal of this project was to drive a car on a simulated track using the [Model Predictive Control](https://en.wikipedia.org/wiki/Model_predictive_control) (MPC) algorithm. The controller calculates steering and throttle values based on reference waypoints and the state of the car (position, speed, heading and actuator values). The finished C++ code uses the [Ipopt](https://projects.coin-or.org/Ipopt) optimizer and [CppAD](https://www.coin-or.org/CppAD/) automatic differentiation libraries.
+
+In this screenshot the **yellow line** illustrates the preferred path based on waypoints. The **green line** shows the path calculated by the MPC controller, using a model based on the steering angle and acceleration actuators while minimizing cross track error (cte).
+
+![Simulator screenshot](writeup/capture.png)
+
+---
+
+## Model
+
+### State
+
+The controller receives the following information from the simulator:
+
+* **px, py** - the current position of the car
+* **𝜓 (psi)** - the heading of the car
+* **v** - speed of the car
+* **wp0x, wp0y, ... wp5x, wp5y** - x and y positions of the next six waypoints, in world space
+* **steering_angle** - current steering angle, in range of [-25°..25°]
+* **throttle** - current throttle position, in range of [-1..1]
+
+The waypoints are first transformed from world space to car space and a third degree polynomial is fitted across them.
+
+Using the polynomial, the following error values are calculated:
+
+* **CTE (cross track error)** - distance from preferred track
+* **ePsi** - difference of orientation
+
+The resulting state vector has six variables:
+
+* **x** - x position in car space (0)
+* **y** - y position in car space (0)
+* **𝜓** - orientation in car space (0)
+* **v** - velocity
+* **cte** - cross track error
+* **e𝜓 (epsi)** - orientation error
+
+### Actuators
+
+The car is controlled by two actuators:
+
+* **𝛿 (steering angle)** - in the range of [-25°..25°]
+* **a (accelerator)** - in the range of [-1..1] where -1 is full brake, 1 is full acceleration
+
+### Update Equations
+
+Our kinetic model is based on the bicycle model to simplify calculations. The bicycle model replaces the rear axle into one unsteered wheel at the centerline of the car, and the front axle with one steered wheel on the same centerline.
+
+![Bicycle model](writeup/bicycle_model.png)
+
+The following update equations are used:
+
+![Update equations](writeup/model.png)
+
+Where **Lf** is the distance of the steering axle from car's center of gravity.
+
+The cost function used by the optimizer is in the form:
+
+![Cost function](writeup/cost.png)
+
+The cost function is a weighted sum of the these error terms:
+
+* **cte** - distance from preferred path
+* **psi error** - difference in orientation
+* **reference velocity** - difference from target speed
+* **steering** - stay on track with minimum steering value
+* **accelerator** - efficient use of throttle/brake
+* **steering change** - to avoid sharp change in steering
+* **accelerator change** - to avoid sharp change in acceleration and braking
+
+
+## Optimizer Parameters
+
+The MPC uses **N** time steps with **dt** duration between steps to optimize the actuator controls (steering/accelerator) while minimizing the cost function.
+
+The optimization step is very processor intensive task. Time spent by the optimizer can be reduced by using less time steps (**N**), however setting the time steps too low will result in suboptimal actuator inputs, possibly even crashing the car.
+
+The duration per step value, in conjunction with the number of steps, defines how far ahead the path is planned. The optimum value sets the look ahead so that the car can react to the path with comfortable actuator inputs, while making sure that sharp changes in the path are not ignored due to long time steps.
+
+
+
+
+
 
 Student discusses the reasoning behind the chosen N (timestep length) and dt (elapsed duration between timesteps) values. Additionally the student details the previous values tried.
-
-If the student preprocesses waypoints, the vehicle state, and/or actuators prior to the MPC procedure it is described.
 
 Student provides details on how they deal with latency.
 

@@ -25,11 +25,14 @@ double rad2deg(double x) { return x * 180 / pi(); }
 // process latency 100ms
 #define PROCESS_LATENCY 0.1
 
-#define LERP(A,B,C) ((A)*(1-(C))+(B)*(C))
+// NOTE: to turn on visualization of preferred path/fitted curve, set this to true
+bool visualize = true;
 
 // set this to false to collect data and write to file for one lap
 bool is_lap_finished = true;
 vector<vector<double>> data_collected;
+
+#define LERP(A,B,C) ((A)*(1-(C))+(B)*(C))
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -195,7 +198,7 @@ int main() {
 					msgJson["steering_angle"] = steer_value;	// limited to -25..25 degrees in solver
 					msgJson["throttle"] = throttle_value;
 
-					if (true) {
+					if (visualize) {
 						// predicted values from MPC (green line)
 						msgJson["mpc_x"] = mpc_x_vals;
 						msgJson["mpc_y"] = mpc_y_vals;
