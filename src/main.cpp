@@ -2,6 +2,7 @@
 #include <uWS/uWS.h>
 #include <chrono>
 #include <iostream>
+#include <fstream>
 #include <thread>
 #include <vector>
 #include "Eigen-3.3/Eigen/Core"
@@ -26,6 +27,10 @@ double rad2deg(double x) { return x * 180 / pi(); }
 
 #define LERP(A,B,C) ((A)*(1-(C))+(B)*(C))
 
+// set this to true to collect data and write to file for one lap
+bool is_lap_finished = false;
+vector<vector<double>> data_collected;
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -48,6 +53,28 @@ double polyeval(Eigen::VectorXd coeffs, double x) {
 		result += coeffs[i] * pow(x, i);
 	}
 	return result;
+}
+
+// calculate distance from end of track
+double dist_end_track(double px, double py) {
+	double dx = -32.906 - px;
+	double dy = 113.271 - py;
+	return sqrt(dx * dx + dy * dy);
+}
+
+// write collected data to csv file
+void write_collected_data() {
+	cout << "write collected data to file" << endl;
+	ofstream myfile;
+	myfile.open("data.csv");
+	myfile << "x,y,psi,v,cte,epsi,steer,throttle,cost,solver,px,py," << endl;
+	for (auto i : data_collected) {
+		for (auto o : i) {
+			myfile << o << ",";
+		}
+		myfile << endl;
+	}
+	myfile.close();
 }
 
 // Fit a polynomial.
@@ -115,6 +142,9 @@ int main() {
 
 					double latency = PROCESS_LATENCY + solver_latency;
 
+					double px_current = px;
+					double py_current = py;
+
 					// move position/psi forward to account for latency
 					double vms = v * 0.44704;            // v in m/s
 					px = px + latency * vms * cos(psi);
@@ -156,9 +186,8 @@ int main() {
 					// solve for steering angle and throttle
 					vector<double> solution = mpc.Solve(state, coeffs, mpc_x_vals, mpc_y_vals);
 
-					double steer_value = solution[0];
-					double throttle_value = solution[1];
-
+					double steer_value = solution[6];
+					double throttle_value = solution[7];
 
 					// Prepare control packet to send to simulator
 					json msgJson;
@@ -193,11 +222,36 @@ int main() {
 					// calculate solver duration for this step
 					auto current_time = high_resolution_clock::now();
 					duration<double, std::milli> solver_duration = current_time - start_time;
+					double solver_duration_sec = 0.001 * solver_duration.count();
+
+					// add solver latency and current position to collected data
+					solution.push_back(solver_duration_sec);
+					solution.push_back(px_current);
+					solution.push_back(py_current);
+
+					// collect data
+					if (!is_lap_finished) {
+						data_collected.push_back(solution);
+					}
 
 					// update solver latency
-					solver_latency = LERP(solver_latency, 0.001 * solver_duration.count(), 0.25);
+					solver_latency = LERP(solver_latency, solver_duration_sec, 0.25);
 
-					cout << "Solver latency: " << solver_latency << endl;
+					// get distance from end of track (one lap of data collected)
+					double dist_from_end = dist_end_track(px_current, py_current);
+
+					//cout << "solver latency: " << solver_latency << endl;
+					//cout << "px:" << px_current << endl;
+					//cout << "py:" << py_current << endl;
+					//cout << "distance from end of track: " << dist_from_end << endl;
+
+					// if close to waypoint at end of first lap, write collected data to csv file
+					if (!is_lap_finished && dist_from_end < 8) {
+						//cout << "-------------- end of track -----------------" << endl;
+						is_lap_finished = true;      // stop collecting data
+						write_collected_data();
+					}
+
 
 					this_thread::sleep_for(chrono::milliseconds(int(PROCESS_LATENCY * 1000)));
 #ifdef USE_LATEST_UWS

@@ -254,8 +254,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs, vector<
 	if (!ok) cout << "ERROR: Solver failed!";
 
 	// Cost
-	auto cost = solution.obj_value;
-	std::cout << "Cost " << cost << std::endl;
+	//auto cost = solution.obj_value;
+	//std::cout << "Cost " << cost << std::endl;
 
 	// resize MPC x,y storage vectors to fit N steps
 	mpc_x_vals.resize(N - 1);
@@ -267,6 +267,14 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs, vector<
 		mpc_y_vals[i] = solution.x[y_start + i + 1];
 	}
 
-	return { -solution.x[delta_start], solution.x[a_start] };
-
+	//return { -solution.x[delta_start], solution.x[a_start] };
+	return { solution.x[x_start + 1],
+			 solution.x[y_start + 1],
+			 solution.x[psi_start + 1],
+			 solution.x[v_start + 1],
+			 solution.x[cte_start + 1],
+			 solution.x[epsi_start + 1],
+			 -solution.x[delta_start],
+			 solution.x[a_start],
+			 solution.obj_value };  // cost
 }
