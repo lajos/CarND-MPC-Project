@@ -27,8 +27,8 @@ double rad2deg(double x) { return x * 180 / pi(); }
 
 #define LERP(A,B,C) ((A)*(1-(C))+(B)*(C))
 
-// set this to true to collect data and write to file for one lap
-bool is_lap_finished = false;
+// set this to false to collect data and write to file for one lap
+bool is_lap_finished = true;
 vector<vector<double>> data_collected;
 
 // Checks if the SocketIO event has JSON data.
